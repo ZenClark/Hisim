@@ -1,0 +1,16 @@
+Every general should have either a random or preset disposition for all other generals.
+Dispositon based on -100 to 100 scale. Below zero denotes aggressive behavior for rulers.
+
+A disposition for current or allied territories should be present. Basic AI should aim for
+increasing the loyalty of the territory, and improving their own dispositon towards it.
+
+A high disposition towards the territory will encourage benifitial behavior, and a low
+disposition will encourage neglect.
+
+Every choice of action should be based on both a disposition, and a variable mood. A percentage
+calculated between the current mood and a leveling disposition should define priorities.
+
+Disposition/Mood; The higher the value, the higher the priority. A higher disposition will increase
+the weight of the mood.
+
+

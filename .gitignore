@@ -1,0 +1,27 @@
+
+# Compiled source
+*.pyc
+
+# Doc folder
+
+/doc/*
+
+# Debug logs
+
+*.out
+
+# Shell scripts
+
+*.sh
+
+# Text files
+
+*.txt
+
+# Eric4 files/folders
+
+*.api
+*.e4p
+*.e4t
+*.eric4project/
+

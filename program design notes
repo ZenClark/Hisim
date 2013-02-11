@@ -1,0 +1,12 @@
+
+Major functionality:
+    *General attack against other generals
+    *General attack against territories
+    Territory defence separate from counter-attacks by inhabiting generals
+    Stamina used for actions
+    Choice of general given for each action within a specific territory
+    Each turn-segment cycles through all loyal generals/governors in owned territories
+    Land generates resources on a set schedule
+    Land can be improved for greater resource gain
+    Fortifications can be made and improved for defence against attacking generals
+    Territory defence separate from counter-attacks by inhabiting generals
