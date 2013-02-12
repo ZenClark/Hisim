@@ -191,10 +191,40 @@ class RootForm(pygameForm):
         
         centerScreen = self.screen.get_width()/2
         
-        #self.parent.guimanager.append(self._widgets, 0)
+        #self.AddWidget(pygameButton(self, self.background, 0, 0, name='Widget One'))
+        #self.AddWidget(pygameButton(self, self.parent.tileSet[0][1], 38, 0, name='Widget Two'))
+        #self.AddWidget(LabelWidget(self, 'Welcome to the Hisim Engine', centerScreen, 0, name='LabelOne'))
+        #self.AddWidget(LabelWidget(self, 'Sorry, but no content at the moment.', centerScreen, 20, name='LabelTwo'))
+            
+        widgets = []
+        for i in range(3):
+            def pname(obj):
+                print "I am called " + obj.name
+            widgets.append(('Number {0}'.format(str(i)), lambda obj: pname(obj)))
 
-    def quit(self):
-        self.parent.quit()
+        wid = WidgetGen.ButtonArray(self, list=widgets)
+        for i in range(wid.__len__()):
+            self.AddWidget(wid[i])
+        f = lambda x: self.RemoveWidget(wid[1])
+        g = lambda x: self.RemoveSet(wid)
+        h = lambda x: self.AddSet(wid)
+        lbl = LabelWidget.GenerateLabel('Remove')
+        
+        self.AddWidget(pygameButton(self, lbl, centerScreen, 260, name='RemoveButton', OnClick=f))
+        
+        lbl = LabelWidget.GenerateLabel('Remove many')
+        self.AddWidget(pygameButton(self, lbl, centerScreen, 280, name='RemoveButtons', OnClick=g))
+        
+        lbl = LabelWidget.GenerateLabel('Add many again')
+        self.AddWidget(pygameButton(self, lbl, centerScreen, 300, name='AddButtons', OnClick=h))        
+        
+        lbl = LabelWidget.GenerateLabel('Quit')
+        quit = lambda  obj: self.parent.quit()
+        self.AddWidget(pygameButton(self, lbl, centerScreen, 240, name='QuitButton', OnClick=quit))
+        
+        del lbl
+        
+        #self.parent.guimanager.append(self._widgets, 0)
 
 class GUI(object):
     def quit(self):

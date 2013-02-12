@@ -69,21 +69,17 @@ class LockedList(object):
                 
         def __getitem__(self, i):
             with self.Lock:
-                return self._widgets[i]
+                return self.__dict__['_widgets'][i]
             
         def append(self, x):
             with self.Lock:
-                self._widgets.append(x)
+                self.__dict__['_widgets'].append(x)
                 
         def remove(self, x):
                 with self.Lock:
-                    self._widgets.remove(x)
-        
-        def __iter__(self):
-            i = 0
-            with self.Lock:
-                yield self._widgets[i]
-            
+                    if x is not None:
+                        if x in self.__dict__['_widgets']:
+                            self.__dict__['_widgets'].remove(x)            
             
 class GuiManager(EventManager):
     def __init__(self, tree_max=3):
@@ -107,12 +103,14 @@ class GuiManager(EventManager):
                                 continue
                     print '({0},{1})\n'.format(str(x), str(y))
             
-    def append(self, list=None, tree=0):
+    def append(self, list=None, item=None, tree=0):
         if list is not None:
             if tree <= self._tree_max:
-                for item in list:
+                for widget in list:
                     self._widgets[tree].append(item)
-                    
+        elif item is not None:
+            self._widgets[tree].append(item)
+            
     def remove(self, widget, tree=0):
         try:
             with self.OnLock:
