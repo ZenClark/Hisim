@@ -2,7 +2,6 @@ import pygame, threading
 from hexagon.hexbase import HexagonMap
 import events
 
-
 class pygameForm():
     __doc__ = \
     """ 
@@ -16,16 +15,17 @@ class pygameForm():
     def __init__(self, clock, parent, manager=None):
         self.parent = parent
         self.screen = parent.screen
+        self.center = (self.screen.get_width()/2, self.screen.get_height()/2)
         if manager is not None:
             self.manager = manager
         else:
             self.manager = parent.guimanager
-        self._widgets = events.LockedList()
+        self._widgets = []
         self.clock = clock
+        self.name = 'pygameForm'
         self.begin()
     
     def begin(self):
-        self.name = 'pygameForm'
         return #Generic form does nothing
 
     def draw(self, fps):
@@ -67,28 +67,36 @@ class pygameForm():
                 self.manager.remove(item)
 
 class pygameWidget(object):
-    def __init__(self, parent, image, x, y, name='Unnamed Widget'):
+    
+    def setActive(self, y):
+        with self.Lock:
+            self._active = y
+    
+    def getActive(self):
+        with self.Lock:
+            return self._active
+    
+    def __init__(self, parent, image, (x, y), name='Unnamed Widget'):
         self.parent = parent
         self.screen = parent.screen
         self.image = image
         self.x = x
         self.y = y
-        self.active = False
+        self._active = False
+        self.active = property(self.getActive, self.setActive)
+        self.Lock = threading.Lock()
     
         self.name = name
         
         self.eventType = None
         
-        
-    def __del__(self):
-        self.deactivate()
-        
     def activate(self):
-        self.activate = True
+        self.active = True
         return
 
     def deactivate(self):
-        self.activate = False
+        self.active = False
+        return
 
     def draw(self):
         if self.active:
@@ -106,8 +114,8 @@ class pygameButton(pygameWidget):
         
         print self.name            
     
-    def __init__(self, parent, image, x, y, name='Unnamed Button', OnClick=None):
-        super(pygameButton, self).__init__(parent, image, x, y, name=name)
+    def __init__(self, parent, image, (x, y), name='Unnamed Button', OnClick=None):
+        super(pygameButton, self).__init__(parent, image, (x, y), name=name)
         
         self.eventType = pygame.MOUSEBUTTONUP
         self.active = True
@@ -134,7 +142,7 @@ class pygameButton(pygameWidget):
         return False
         
 class LabelWidget(pygameWidget):
-    def __init__(self, parent, text, x, y, name='Unnamed Label'):
+    def __init__(self, parent, text, (x, y), name='Unnamed Label'):
         
         self.y = y
         self.name = name
@@ -150,15 +158,94 @@ class LabelWidget(pygameWidget):
 
         self.active = True
 
-    @staticmethod
-    def GenerateLabel(text):
-        """ 
-        A static method that generates and returns a text image without creating a full label widget
-        :param string text: The text for the label to display 
+    def changeText(self, txt):
+        self.text = txt
+        self.image = self.font.render(self.text, True, (0xff, 0xff, 0xff))
+        self.x = x - self.image.get_width()/2
+
+class TextDisplayWidget(pygameWidget):
+    def __init__(self, parent, text, (x, y), name='Unnamed Text Display Widget'):
+        super(TextDisplayWidget, self).__init__(parent, None, (x, y), name=name)
+        self.box = (600, 200)
+        self.x = x
+        self.y = y
+        self.background = pygame.Rect(x, y, self.box[0], self.box[1])
+        self.font = pygame.font.Font(pygame.font.get_default_font(),18)
+        self.buffer = []
+        self.lines = []
+        self.line_size = self.font.get_linesize()
+        self.lines_max = self.box[1]//self.line_size
+        self.bufferSize = 300
+        for x in range(self.bufferSize):
+            self.buffer.append(WidgetGen.Label(''))
+
+    def Print(self, text=''):
+        self.lines.insert(0, WidgetGen.Label(text))
+        self.buffer.insert(0, WidgetGen.Label(text))
+        if self.lines.__len__() >= self.lines_max:
+            del self.lines[self.lines.__len__()-1]
+        if self.buffer.__len__() >= self.bufferSize:
+            del self.buffer[self.buffer.__len__()-1]
+    
+    def Output(self, index=None):
+        if index is None:
+            index = self.bufferSize
+            
+        for i in range(self.lines_max):
+            self.lines[self.lines_max - i] = self.buffer[index + i]
+            
+    def draw(self):
+        if self.active:
+            for i in range(self.lines_max):
+                self.screen.blit(self.buffer[i], (self.x, self.y-((i+1)*self.line_size)))
+            
+class InputWidget(pygameWidget):
+    def __init__(self, parent, text, (x, y), name='Unnamed Input', OnEnter=None):
+        image = WidgetGen.Label(text)
+        super(InputWidget, self).__init__(parent, image, (x, y), name=name)
         
-        """
-        font = pygame.font.Font(pygame.font.get_default_font(),18)
-        return font.render(text, True, (0xff, 0xff, 0xff))
+        if OnEnter is not None:
+            self.OnEnter = lambda: OnEnter(self)
+        else:
+            self.OnEnter = lambda: self.deactivate()
+            
+        """ The string value containing the current input data (Textbox value). """
+        self.value = 'nothing yet'
+        self.valueImage = WidgetGen.Label(self.value)
+        
+        self.y2 = self.y+self.image.get_height()+2
+        
+        self.eventType = pygame.KEYUP
+        self.activate()
+        self.show = True
+
+    def OnKey(self, key=None):
+        if key is not None:
+            if key >= 97 and key <= 122:#Lowercase Letters
+                self.value += pygame.key.name(key)
+            
+            elif key >= 48 and key <= 57: #Number
+                self.value += pygame.key.name(key)
+            
+            elif key is 8: #Delete
+                value = ''
+                for i in range(self.value.__len__()-1):
+                    value += self.value[i]
+                self.value = value
+                
+            elif key is 32: #Space
+                self.value += ' '
+                
+            elif key is 13: #Enter/return
+                self.OnEnter()
+                return
+                
+            self.valueImage = WidgetGen.Label(self.value)                
+
+    def draw(self):
+        if self.show:
+            self.screen.blit(self.image, (self.x, self.y))
+            self.screen.blit(self.valueImage, (self.x, self.y2))
 
 class WidgetGen(object):
     @staticmethod
@@ -166,7 +253,7 @@ class WidgetGen(object):
         """ 
         A static method that generates and returns a text image without creating a full label widget
         :param string text: The text for the label to display 
-        
+        :return Surface: A surface containing the text rendered with the default font at size 18
         """
         font = pygame.font.Font(pygame.font.get_default_font(),18)
         return font.render(text, True, (0xff, 0xff, 0xff))
@@ -178,7 +265,7 @@ class WidgetGen(object):
             text = choice[0]
             image = WidgetGen.Label(text)
             func = choice[1]
-            button = pygameButton(parent, image, x, y, OnClick=func, name=text)
+            button = pygameButton(parent, image, (x, y), OnClick=func, name=text)
             widgets.append(button)
             y += 20
             
@@ -191,8 +278,8 @@ class RootForm(pygameForm):
         
         centerScreen = self.screen.get_width()/2
         
-        #self.parent.guimanager.append(self._widgets, 0)
-
+        self.parent.guimanager.append(self._widgets, 0)
+        
     def quit(self):
         self.parent.quit()
 
@@ -220,7 +307,7 @@ class GUI(object):
     
     status = property(statusGet, statusSet, statusDel, 'Thread safe status property')    
     
-    def __init__(self):
+    def __init__(self, root):
         self._status = True
         self.StatusLock = threading.Lock()        
         pygame.init()    
@@ -241,7 +328,7 @@ class GUI(object):
         for i in firstSet:
             self.tileSet[0].append(pygame.image.load(i).convert())
         
-        self.root = RootForm(self.clock, self)
+        self.root = root(self.clock, self, self.guimanager)
 
     def mainLoop(self):
         self.thread_guiManager.start()
@@ -251,9 +338,3 @@ class GUI(object):
         print 'Main Loop Terminated'
         pygame.quit()
         return
-
-print __name__
-
-if __name__ == '__main__':
-        core = GUI()
-        core.mainLoop()

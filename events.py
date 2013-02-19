@@ -69,8 +69,8 @@ class LockedList(object):
                 
         def __getitem__(self, i):
             with self.Lock:
-                return self.__dict__['_widgets'][i]
-            
+                    return self.__dict__['_widgets'][i]
+                    
         def append(self, x):
             with self.Lock:
                 self.__dict__['_widgets'].append(x)
@@ -87,21 +87,30 @@ class GuiManager(EventManager):
         self._tree_max = tree_max
         self._widgets = LockedList()
         self._on = True
-        for counter in range(tree_max-1):
+        for counter in range(tree_max):
             self._widgets.append([])
+        if True:
+            pass
             
     def run(self):
         while self.on:
-            for event in pygame.event.get():
-                if event.type is pygame.MOUSEBUTTONUP:
-                    x = event.pos[0]
-                    y = event.pos[1]
-                    for tree in self._widgets:
-                        for widget in tree:
-                            if widget.active and (widget.eventType is pygame.MOUSEBUTTONUP) and widget.Within(x, y):
-                                widget.OnClick()
-                                continue
-                    print '({0},{1})\n'.format(str(x), str(y))
+            event = pygame.event.wait()
+            if event.type is pygame.MOUSEBUTTONUP:
+                x = event.pos[0]
+                y = event.pos[1]
+                for tree in self._widgets:
+                    for widget in tree:
+                        if widget.active and (widget.eventType is pygame.MOUSEBUTTONUP) and widget.Within(x, y):
+                            widget.OnClick()
+                            continue
+                print '({0},{1})\n'.format(str(x), str(y))
+                
+            elif event.type is pygame.KEYUP:
+                for tree in self._widgets:
+                    for widget in tree:
+                        if widget.active and (widget.eventType is pygame.KEYUP):
+                            widget.OnKey(event.key)
+                print str(event.key) + '\n'
             
     def append(self, list=None, item=None, tree=0):
         if list is not None:

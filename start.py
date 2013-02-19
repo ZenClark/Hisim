@@ -1,3 +1,5 @@
-from game import core
+from gui import GUI
+from gui_core import GUICore
 
-Core = core()
+Core = GUI(GUICore)
+Core.mainLoop()
