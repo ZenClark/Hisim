@@ -1,4 +1,4 @@
-import pygame, threading
+import pygame, threading, pickle, os
 from hexagon.hexbase import HexagonMap
 import events
 
@@ -30,7 +30,7 @@ class pygameForm():
 
     def draw(self, fps):
 
-        self.screen.fill((0, 0, 0))
+        self.screen.fill((50, 0, 0))
         for x in self._widgets:
             x.draw()
         
@@ -88,7 +88,7 @@ class pygameWidget(object):
     
         self.name = name
         
-        self.eventType = None
+        self.eventTypes = []
         
     def activate(self):
         self.active = True
@@ -117,7 +117,7 @@ class pygameButton(pygameWidget):
     def __init__(self, parent, image, (x, y), name='Unnamed Button', OnClick=None):
         super(pygameButton, self).__init__(parent, image, (x, y), name=name)
         
-        self.eventType = pygame.MOUSEBUTTONUP
+        self.eventTypes = [pygame.MOUSEBUTTONUP]
         self.active = True
         
         if OnClick is None:
@@ -148,7 +148,7 @@ class LabelWidget(pygameWidget):
         self.name = name
         self.parent = parent
         self.screen = parent.screen
-        self.eventType = None
+        self.eventTypes = []
 
         self.font = pygame.font.Font(pygame.font.get_default_font(),18)
         self.text = text
@@ -210,19 +210,22 @@ class InputWidget(pygameWidget):
             self.OnEnter = lambda: self.deactivate()
             
         """ The string value containing the current input data (Textbox value). """
-        self.value = 'nothing yet'
+        self.value = ''
         self.valueImage = WidgetGen.Label(self.value)
         
         self.y2 = self.y+self.image.get_height()+2
         
-        self.eventType = pygame.KEYUP
+        self.eventTypes = [pygame.KEYUP]
         self.activate()
         self.show = True
 
-    def OnKey(self, key=None):
+    def OnKey(self, key=None, mod=None):
         if key is not None:
-            if key >= 97 and key <= 122:#Lowercase Letters
-                self.value += pygame.key.name(key)
+            if key >= 97 and key <= 122:#Letters
+                if 1 & mod:
+                    self.value += pygame.key.name(key).upper()                    
+                else:
+                    self.value += pygame.key.name(key)
             
             elif key >= 48 and key <= 57: #Number
                 self.value += pygame.key.name(key)
@@ -246,6 +249,63 @@ class InputWidget(pygameWidget):
         if self.show:
             self.screen.blit(self.image, (self.x, self.y))
             self.screen.blit(self.valueImage, (self.x, self.y2))
+
+class territoryDisplay(pygameWidget):
+    def __init__(self, parent, directory, name='Unnamed territory display'):
+        super(territoryDisplay, self).__init__(parent, None, (320, 240), name=name)
+        self.territories = events.LockedList()
+        self.originalBorders = events.LockedList()
+        black = '(0, 0, 0, 255)'
+        territory = ''
+        border = ''
+        for id in range(2):
+            surPath ='./{0}/land_{1}.sur'.format(directory, str(id))
+            borPath ='./{0}/land_{1}.bor'.format(directory, str(id))
+            try:
+                if not os.path.isfile(surPath):
+                    print 'Surface file does not exist.\n'
+                    raise IOError
+                else:
+                    contents = ''
+                    with open(surPath, 'r') as file:
+                        for line in file:            
+                            contents += line
+                    territory = pygame.image.fromstring(contents, (200, 200), 'RGBA')
+                    del contents
+                    
+                    if not os.path.isfile(borPath):
+                        print 'Border file does not exist.\n'
+                        raise IOError
+                    else:
+                        border = pickle.load(open(borPath, 'r'))
+            except:
+                territory = pygame.image.load('./{0}/land_{1}.png'.format(directory, str(id)))
+                border = []
+                for x in range(200):
+                    for y in range(200):
+                        color = territory.get_at((x, y))
+                        if str(color) == black:
+                            border.append((x, y))
+                with open(surPath.format(directory, str(id)), 'w') as file:
+                     file.write(pygame.image.tostring(territory, 'RGBA'))
+                with open(borPath, 'w') as file:
+                    pickle.dump(border, file)
+            finally:
+                self.territories.append(territory)
+                self.originalBorders.append(border)
+        
+    def changeOwnership(self, territoryID, newowner):
+        while newowner.master is not None:
+                newowner = newowner.master
+        with self.territories as Territories, self.originalBorders as Borders:
+            for borderValue in Borders[territoryID]:
+                Territories[territoryID].set_at(borderValue, newowner.color)
+    
+    def draw(self):
+        if self.active:
+            with self.territories as Territories:
+                for place in Territories:
+                    self.screen.blit(place, (self.x, self.y))
 
 class WidgetGen(object):
     @staticmethod
@@ -307,7 +367,7 @@ class GUI(object):
     
     status = property(statusGet, statusSet, statusDel, 'Thread safe status property')    
     
-    def __init__(self, root):
+    def __init__(self, root, core):
         self._status = True
         self.StatusLock = threading.Lock()        
         pygame.init()    
@@ -316,11 +376,12 @@ class GUI(object):
         
         self.evalStatus = lambda obj: obj.status
         
-        #self.eventmanager = events.EventManager([])
+        self.eventmanager = events.EventManager([])
         #self.quitEvent = events.Event(self.quit, self, self.evalStatus)
         
         self.guimanager = events.GuiManager(3)
-        self.thread_guiManager = threading.Thread(target=self.guimanager.run, name='Event Manager')
+        self.thread_guiManager = threading.Thread(target=self.guimanager.run, name='GUI Event Manager')
+        self.thread_eventManager = threading.Thread(target=self.eventmanager.run, name='Event Manager')
 
         self.tileSet = []
         self.tileSet.append([])
@@ -330,8 +391,11 @@ class GUI(object):
         
         self.root = root(self.clock, self, self.guimanager)
 
+        self.core = core
+
     def mainLoop(self):
         self.thread_guiManager.start()
+        self.thread_eventManager.start()
         while self.status:
             self.root.draw(30)
 

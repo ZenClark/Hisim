@@ -26,9 +26,10 @@ class Attributes(object):
         
 class General(object):
     
-    def __init__(self, core, name='Empty', isPlayer=False, isRuler=False, isGovernor=False, master=None):
+    def __init__(self, core, name='Empty', isPlayer=False, isRuler=False, isGovernor=False, master=None, color=None, id=None):
         self.core = core
         
+        self.id = id        
         self.name = name
         
         self.isPlayer = isPlayer
@@ -57,6 +58,10 @@ class General(object):
             self.isRuler = False
         if isRuler and not isPlayer:
             self.AI = GenericAI(self.core, self)
+            
+        if color is None:
+            color = (randint(100, 255), randint(100, 255), randint(100, 255), 255)
+        self.color = color
             
     def checkLoyalty(self, target):
         if self == target:
@@ -121,4 +126,8 @@ class General(object):
         if self.isRuler and not self.isPlayer:
             self.AI.run()
         self.strength += self.stats.Stamina()/2 #I don't want them to gain strength too fast.
+        
+class Player(General):
+    def __init__(self, core, name='Empty', isPlayer=False, isRuler=False, isGovernor=False, master=None, color=None, id=None):
+        super(Player, self).__init__(core, name, True, True, True, None, color= (255,255,0,255), id=0)
         

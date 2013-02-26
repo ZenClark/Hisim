@@ -2,9 +2,9 @@ import pygame
 import thread, threading
 
 class Event(object):
-    
+
     def __init__(self, handler, obj, evaluation):
-        
+
         self.eval = lambda : evaluation(obj)
         self._owner = obj
         self._handler = handler
@@ -61,26 +61,37 @@ class EventManager(object):
     def remove(self, item):
         if isinstance(item, Event):
             self._events.remove(item)
-    
+
 class LockedList(object):
-        def __init__(self):
-            self.Lock = threading.Lock()
-            self._widgets = []
-                
-        def __getitem__(self, i):
+    def __enter__(self):
+        self.Lock.acquire()
+        return self._list
+    
+    def __exit__(self, exc_type, exc_val, exc_traceback):
+        self.Lock.release()
+    
+    def __init__(self):
+        self.Lock = threading.Lock()
+        self._list = []
+
+    def __getitem__(self, i):
+        with self.Lock:
+                return self.__dict__['_list'][i]
+
+    def __len__(self):
+        with self.Lock:
+            return self.__dict__['_list'].__len__()
+
+    def append(self, x):
+        with self.Lock:
+            self.__dict__['_list'].append(x)
+
+    def remove(self, x):
             with self.Lock:
-                    return self.__dict__['_widgets'][i]
-                    
-        def append(self, x):
-            with self.Lock:
-                self.__dict__['_widgets'].append(x)
-                
-        def remove(self, x):
-                with self.Lock:
-                    if x is not None:
-                        if x in self.__dict__['_widgets']:
-                            self.__dict__['_widgets'].remove(x)            
-            
+                if x is not None:
+                    if x in self.__dict__['_list']:
+                        self.__dict__['_list'].remove(x)            
+
 class GuiManager(EventManager):
     def __init__(self, tree_max=3):
         self.OnLock = threading.Lock()
@@ -91,35 +102,39 @@ class GuiManager(EventManager):
             self._widgets.append([])
         if True:
             pass
-            
+
     def run(self):
         while self.on:
             event = pygame.event.wait()
             if event.type is pygame.MOUSEBUTTONUP:
                 x = event.pos[0]
                 y = event.pos[1]
-                for tree in self._widgets:
-                    for widget in tree:
-                        if widget.active and (widget.eventType is pygame.MOUSEBUTTONUP) and widget.Within(x, y):
-                            widget.OnClick()
-                            continue
-                print '({0},{1})\n'.format(str(x), str(y))
-                
+                with self._widgets as Widgets:
+                    for tree in Widgets:
+                        for widget in tree:
+                            if widget.active and (pygame.MOUSEBUTTONUP in widget.eventTypes) and widget.Within(x, y):
+                                widget.OnClick()
+                                continue
+                    print '({0},{1})\n'.format(str(x), str(y))
+
             elif event.type is pygame.KEYUP:
-                for tree in self._widgets:
-                    for widget in tree:
-                        if widget.active and (widget.eventType is pygame.KEYUP):
-                            widget.OnKey(event.key)
-                print str(event.key) + '\n'
-            
+                with self._widgets as Widgets:
+                    for tree in Widgets:
+                        for widget in tree:
+                            if widget.active and ( pygame.KEYUP in widget.eventTypes):
+                                widget.OnKey(event.key, pygame.key.get_mods())
+                    if event.key <= 122:
+                        print str(event.key) + ', ' + str(bin(pygame.key.get_mods())) + '\n'
+
     def append(self, list=None, item=None, tree=0):
         if list is not None:
             if tree <= self._tree_max:
-                for widget in list:
-                    self._widgets[tree].append(item)
+                with self._widgets as Widgets:
+                    for widget in list:
+                        Widgets[tree].append(item)
         elif item is not None:
             self._widgets[tree].append(item)
-            
+
     def remove(self, widget, tree=0):
         try:
             with self.OnLock:
